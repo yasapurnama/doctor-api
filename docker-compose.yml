@@ -1,0 +1,21 @@
+version: '3.9'
+
+services:
+  api:
+    build: .
+    restart: always
+    ports:
+      - "0.0.0.0:80:80"
+    environment:
+      - PORT=80
+      - MONGO_URI=mongodb://mongodb:27017/doctor-api
+    depends_on:
+      - mongodb
+
+  mongodb:
+    image: mongo
+    restart: always
+    volumes:
+      - "~/mongodb:/data/db"
+    ports:
+      - '127.0.0.1:27017:27017'

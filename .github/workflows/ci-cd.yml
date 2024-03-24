@@ -31,3 +31,44 @@ jobs:
 
       - name: Run tests
         run: npm test
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    env:
+      SSH_USER: ${{ secrets.SERVER_USERNAME }}
+      SSH_KEY: ${{ secrets.SSH_PRIVATE_KEY }}
+      SSH_HOST: ${{ secrets.SERVER_HOST }}
+      MONGO_URI: ${{ secrets.MONGO_URI }}
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Configure SSH
+        run: |
+          mkdir -p ~/.ssh/
+          echo "$SSH_KEY" > ~/.ssh/deploy_server.key
+          chmod 600 ~/.ssh/deploy_server.key
+          cat >>~/.ssh/config <<END
+          Host deploy_server
+            HostName $SSH_HOST
+            User $SSH_USER
+            IdentityFile ~/.ssh/deploy_server.key
+            StrictHostKeyChecking no
+          END
+
+      - name: Create directory
+        run: ssh deploy_server "mkdir -p /home/$SSH_USER/doctor-api"
+
+      - name: Copy files to server
+        run: rsync -avzr --delete . deploy_server:/home/$SSH_USER/doctor-api/
+
+      - name: Setup MongoDB
+        run: ssh deploy_server "cd /home/$SSH_USER/doctor-api && docker compose up -d mongodb"
+
+      - name: Build Docker image
+        run: ssh deploy_server "cd /home/$SSH_USER/doctor-api && docker compose build"
+
+      - name: Start Appliaction
+        run: ssh deploy_server "cd /home/$SSH_USER/doctor-api && docker compose down -v api && docker compose up -d api"
